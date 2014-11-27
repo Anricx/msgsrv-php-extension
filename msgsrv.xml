@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?> 
+<!DOCTYPE extension SYSTEM "extension.dtd">
+<extension name="msgsrv" version="1.0.0">
+	<summary>MsgSrv v1 Client PHP extension</summary>
+	<description>
+	This is a msgsrv v1 client extension specification
+	showing how to use CodeGen_PECL for
+	extension generation.
+	</description>	
+	<maintainers>
+    	<maintainer>
+      		<user>dengt</user>
+      		<name>Deng Tao</name>
+      		<email>dengt@007ka.com</email>
+      		<role>lead</role>
+    	</maintainer>
+  	</maintainers>
+
+ 	<phpini name="debug" type="bool" access="system" value="0"/>
+ 	<phpini name="read_buffer_size" type="int" access="system" value="1024"/>
+	<phpini name="request_timeout" type="int" access="system" value="30"/>
+	<phpini name="read_timeout" type="int" access="system" value="30"/>
+	<phpini name="select_timeout" type="int" access="system" value="30"/>
+	
+	<!-- Module Initialization -->
+	<function role="internal" name="MINIT">
+ 	</function>
+ 	<!-- Request Initialization -->
+ 	<function role="internal" name="RINIT">
+	</function>
+ 	<!-- Request Shutdown -->
+	<function role="internal" name="RSHUTDOWN">
+	</function>
+	<!-- Module Information -->
+	<function role="internal" name="MINFO">
+ 	</function>
+ 	<!-- Module Shutdown -->
+	<function role="internal" name="MSHUTDOWN">
+	</function>
+
+	<functions>
+		<!-- open connection with msgsrv -->
+		<function role="public" name="msgsrv_open">
+			<proto>resource msgsrv_open(string host, int port, string appname, string username, string password)</proto>
+		</function>
+		<!-- send message to remote -->
+		<function role="public" name="msgsrv_send">
+			<proto>bool msgsrv_send(string target, string cmd, string content, resource link)</proto>
+		</function>
+		<!-- receive message to remote -->
+		<function role="public" name="msgsrv_receive">
+			<proto>bool msgsrv_receive(resource link, callback callback[, int timeout])</proto>
+		</function>
+		<!-- send message to remote and waite results -->
+		<function role="public" name="msgsrv_request">
+			<proto>array msgsrv_request(string target, string cmd, string content, resource link[, int timeout])</proto>
+		</function>
+		<!-- get last error -->
+		<function role="public" name="msgsrv_last_error">
+			<proto>int msgsrv_last_error()</proto>
+		</function>
+		<!-- close connection with msgsrv -->
+		<function role="public" name="msgsrv_close">
+			<proto>void msgsrv_close(resource link)</proto>
+		</function>
+	</functions>
+
+</extension>
