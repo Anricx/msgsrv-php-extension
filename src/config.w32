@@ -1,8 +1,8 @@
 // $ Id: $
 // vim:ft=javascript
 
-ARG_ENABLE('msgsrv' , 'MsgSrv v1 Client PHP extension', 'no');
+ARG_ENABLE('msgsrv' , 'MsgSrv PHP extension', 'no');
 if (PHP_MSGSRV == "yes") {
-  EXTENSION("msgsrv", "msgsrv.c");
+  EXTENSION("msgsrv", "msgsrv.c md5.c library.c");
   AC_DEFINE("HAVE_MSGSRV", 1, "msgsrv support");
 }

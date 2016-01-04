@@ -24,7 +24,7 @@ if test "$PHP_MSGSRV" != "no"; then
   PHP_SUBST(MSGSRV_SHARED_LIBADD)
   AC_DEFINE(HAVE_MSGSRV, 1, [ ])
 
-  PHP_NEW_EXTENSION(msgsrv, msgsrv.c , $ext_shared)
+  PHP_NEW_EXTENSION(msgsrv, msgsrv.c md5.c library.c, $ext_shared)
 
 fi
 

@@ -1,12 +1,12 @@
 /*
- +----------------------------------------------------------------------+
- | ChinaRoad license:                                                      |
- +----------------------------------------------------------------------+
- | Authors: Deng Tao <dengt@007ka.com>                                  |
- +----------------------------------------------------------------------+
- */
-
-/* $ Id: $ */
+   +----------------------------------------------------------------------+
+   | PHP MsgSrv Extension v1.2                                            |
+   +----------------------------------------------------------------------+
+   | Copyright (c) 2015 ChinaRoad Co., Ltd.  All rights reserved.         |
+   +----------------------------------------------------------------------+
+   | Author: Deng Tao <dengt@660pp.com>                                   |
+   +----------------------------------------------------------------------+
+*/
 
 #ifndef PHP_MSGSRV_H
 #define PHP_MSGSRV_H
@@ -22,8 +22,8 @@ extern "C" {
 #include <php.h>
 
 #ifdef HAVE_MSGSRV
-#define PHP_MSGSRV_VERSION "1.1.0 (Release)"
-#define PHP_MSGSRV_RELEASED "2014-08-21"
+#define PHP_MSGSRV_VERSION "1.3.0 (Release)"
+#define PHP_MSGSRV_RELEASED "2015-12-25"
 #define PHP_MSGSRV_AUTHORS "dengt 'dengt@660pp.com' (lead)\n"
 
 #include <php_ini.h>
@@ -35,6 +35,22 @@ extern "C" {
 #endif
 #ifdef  __cplusplus
 extern "C" {
+#endif
+
+#ifdef ZEND_ENGINE_2
+# include "zend_exceptions.h"
+#else
+  /* PHP 4 compat */
+# define OnUpdateLong   OnUpdateInt
+# define E_STRICT       E_NOTICE
+#endif
+
+#if (PHP_MAJOR_VERSION == 5 && PHP_MINOR_VERSION < 3)
+const zend_fcall_info empty_fcall_info = { 0, NULL, NULL, NULL, NULL, 0, NULL, NULL, 0 };
+#endif
+
+#if (PHP_MAJOR_VERSION >= 5 && PHP_MINOR_VERSION > 3)
+#define list_entry zend_rsrc_list_entry
 #endif
 
 extern zend_module_entry msgsrv_module_entry;
@@ -69,97 +85,7 @@ PHP_MINFO_FUNCTION(msgsrv);
 #define PROP_SET_STRING(name, s) zend_update_property_string(_this_ce, _this_zval, #name, strlen(#name), s TSRMLS_CC)
 #define PROP_SET_STRINGL(name, s, l) zend_update_property_stringl(_this_ce, _this_zval, #name, strlen(#name), s, l TSRMLS_CC)
 
-ZEND_BEGIN_MODULE_GLOBALS(msgsrv)
-zend_bool debug;
-long read_buffer_size;
-long request_timeout;
-long read_timeout;
-long select_timeout;
-long last_error; // last error
-HashTable *link_table;// connection table			:sockfd => php_msgsrv_link
-
-ZEND_END_MODULE_GLOBALS(msgsrv)
-
-#ifdef ZTS
-#define MSGSRV_G(v) TSRMG(msgsrv_globals_id, zend_msgsrv_globals *, v)
-#else
-#define MSGSRV_G(v) (msgsrv_globals.v)
-#endif
-
-PHP_FUNCTION(msgsrv_open);
-#if (PHP_MAJOR_VERSION >= 5)
-ZEND_BEGIN_ARG_INFO_EX(msgsrv_open_arg_info, ZEND_SEND_BY_VAL, ZEND_RETURN_VALUE, 5)
-ZEND_ARG_INFO(0, host)
-ZEND_ARG_INFO(0, port)
-ZEND_ARG_INFO(0, appname)
-ZEND_ARG_INFO(0, username)
-ZEND_ARG_INFO(0, password)
-ZEND_END_ARG_INFO()
-#else /* PHP 4.x */
-#define msgsrv_open_arg_info NULL
-#endif
-
-PHP_FUNCTION(msgsrv_phy_addr);
-#if (PHP_MAJOR_VERSION >= 5)
-ZEND_BEGIN_ARG_INFO_EX(msgsrv_phy_addr_arg_info, ZEND_SEND_BY_VAL, ZEND_RETURN_VALUE, 1)
-  ZEND_ARG_INFO(0, link)
-ZEND_END_ARG_INFO()
-#else /* PHP 4.x */
-#define msgsrv_phy_addr_arg_info NULL
-#endif
-
-PHP_FUNCTION(msgsrv_send);
-#if (PHP_MAJOR_VERSION >= 5)
-ZEND_BEGIN_ARG_INFO_EX(msgsrv_send_arg_info, ZEND_SEND_BY_VAL, ZEND_RETURN_VALUE, 4)
-ZEND_ARG_INFO(0, target)
-ZEND_ARG_INFO(0, cmd)
-ZEND_ARG_INFO(0, content)
-ZEND_ARG_INFO(0, link)
-ZEND_END_ARG_INFO()
-#else /* PHP 4.x */
-#define msgsrv_send_arg_info NULL
-#endif
-
-PHP_FUNCTION(msgsrv_receive);
-#if (PHP_MAJOR_VERSION >= 5)
-ZEND_BEGIN_ARG_INFO_EX(msgsrv_receive_arg_info, ZEND_SEND_BY_VAL, ZEND_RETURN_VALUE, 6)
-ZEND_ARG_INFO(0, link)
-ZEND_ARG_INFO(0, callback)
-ZEND_ARG_INFO(0, timeout)
-ZEND_END_ARG_INFO()
-#else /* PHP 4.x */
-#define msgsrv_receive_arg_info NULL
-#endif
-
-PHP_FUNCTION(msgsrv_request);
-#if (PHP_MAJOR_VERSION >= 5)
-ZEND_BEGIN_ARG_INFO_EX(msgsrv_request_arg_info, ZEND_SEND_BY_VAL, ZEND_RETURN_VALUE, 4)
-ZEND_ARG_INFO(0, target)
-ZEND_ARG_INFO(0, cmd)
-ZEND_ARG_INFO(0, content)
-ZEND_ARG_INFO(0, link)
-ZEND_ARG_INFO(0, timeout)
-ZEND_END_ARG_INFO()
-#else /* PHP 4.x */
-#define msgsrv_request_arg_info NULL
-#endif
-
-PHP_FUNCTION(msgsrv_last_error);
-#if (PHP_MAJOR_VERSION >= 5)
-ZEND_BEGIN_ARG_INFO_EX(msgsrv_last_error_arg_info, ZEND_SEND_BY_VAL, ZEND_RETURN_VALUE, 0)
-ZEND_END_ARG_INFO()
-#else /* PHP 4.x */
-#define msgsrv_last_error_arg_info NULL
-#endif
-
-PHP_FUNCTION(msgsrv_close);
-#if (PHP_MAJOR_VERSION >= 5)
-ZEND_BEGIN_ARG_INFO_EX(msgsrv_close_arg_info, ZEND_SEND_BY_VAL, ZEND_RETURN_VALUE, 1)
-ZEND_ARG_INFO(0, link)
-ZEND_END_ARG_INFO()
-#else /* PHP 4.x */
-#define msgsrv_close_arg_info NULL
-#endif
+#include "msgsrv_structs.h"
 
 #ifdef  __cplusplus
 } // extern "C" 
@@ -168,6 +94,7 @@ ZEND_END_ARG_INFO()
 #endif /* PHP_HAVE_MSGSRV */
 
 #endif /* PHP_MSGSRV_H */
+
 
 /*
  * Local variables:

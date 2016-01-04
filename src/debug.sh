@@ -1,4 +1,5 @@
 make clean
 make install
+service php-fpm restart
 service apache2 restart
-php -f tests/test.php
+php -f run.php

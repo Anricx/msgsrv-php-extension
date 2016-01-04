@@ -68,3 +68,34 @@ using the extension_loaded() function:
 The extension will also add its own block to the output
 of phpinfo();
 
+logger
+=======
+[MsgSrv][O] => Connection Open
+[MsgSrv][A] => Authorize
+[MsgSrv][F] => Function Execute
+[MsgSrv][R] => Stream Data Read
+[MsgSrv][W] => Stream Data Write
+[MsgSrv][X] => Stream Write Error
+[MsgSrv][S] => System Information
+[MsgSrv][C] => Close Stream
+[MsgSrv][P] => Link Test/Pulse
+
+syslog
+=======
+priority is a combination of the facility and the level. Possible values are:
+syslog() Priorities (in descending order)
+Constant    Description
+LOG_EMERG   system is unusable
+LOG_ALERT   action must be taken immediately
+LOG_CRIT    critical conditions
+LOG_ERR     error conditions
+LOG_WARNING warning conditions
+LOG_NOTICE  normal, but significant, condition
+LOG_INFO    informational message
+LOG_DEBUG   debug-level message
+
+notes
+=======
+1. &EG(persistent_list) key must unique!
+2. all persistent data share this list!
+3. in PHP_RSHUTDOWN_FUNCTION, php_printf() is not usable.
