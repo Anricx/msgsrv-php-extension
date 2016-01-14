@@ -183,6 +183,10 @@ int msgsrv_socket_connect(MsgSrvSocket *msgsrv_socket, int authorize, int trace_
     int host_len, err = 0;
     php_netstream_data_t *sock;
     int tcp_flag = 1;
+    int keep_alive = 1; // enable keep alive
+    int keep_idle = 60;
+    int keep_intvl = 5;
+    int keep_count = 3;
 
     char *playload = NULL, *_from = NULL, *_cmd = NULL, *_body = NULL, *reply;
     char *random = NULL, *plain = NULL;
@@ -239,6 +243,10 @@ int msgsrv_socket_connect(MsgSrvSocket *msgsrv_socket, int authorize, int trace_
     /* set TCP_NODELAY */
     sock = (php_netstream_data_t*)msgsrv_socket->stream->abstract;
     setsockopt(sock->socket, IPPROTO_TCP, TCP_NODELAY, (char *) &tcp_flag, sizeof(int));
+    setsockopt(sock->socket, SOL_SOCKET, SO_KEEPALIVE, (void *) &keep_alive, sizeof(int));
+    setsockopt(sock->socket, SOL_TCP, TCP_KEEPIDLE, (void *) &keep_idle, sizeof(int));
+    setsockopt(sock->socket, SOL_TCP, TCP_KEEPINTVL, (void *) &keep_intvl, sizeof(int));
+    setsockopt(sock->socket, SOL_TCP, TCP_KEEPCNT, (void *) &keep_count, sizeof(int));
 
     php_stream_auto_cleanup(msgsrv_socket->stream);
 

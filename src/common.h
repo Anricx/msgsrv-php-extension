@@ -15,6 +15,14 @@
 #define TRUE 1
 #endif
 
+#ifndef ALIVE
+#define ALIVE 1
+#endif
+
+#ifndef DEAD
+#define DEAD 0
+#endif
+
 #ifndef FALSE
 #define FALSE 0
 #endif

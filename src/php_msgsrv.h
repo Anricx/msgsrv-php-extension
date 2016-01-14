@@ -22,8 +22,8 @@ extern "C" {
 #include <php.h>
 
 #ifdef HAVE_MSGSRV
-#define PHP_MSGSRV_VERSION "1.3.0 (Release)"
-#define PHP_MSGSRV_RELEASED "2015-12-25"
+#define PHP_MSGSRV_VERSION "1.4.0 (Release)"
+#define PHP_MSGSRV_RELEASED "2016-01-14"
 #define PHP_MSGSRV_AUTHORS "dengt 'dengt@660pp.com' (lead)\n"
 
 #include <php_ini.h>

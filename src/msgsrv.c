@@ -1480,7 +1480,9 @@ static void _close_msgsrv_link(zend_rsrc_list_entry *rsrc TSRMLS_DC)
     }
     if (link->id >= 0) {
         link->socket = NULL;
-        zend_hash_index_del(MSGSRV_SG(page_links), link->id);
+        if (MSGSRV_SG(status) == ALIVE && zend_hash_index_exists(MSGSRV_SG(page_links), link->id)) {
+            zend_hash_index_del(MSGSRV_SG(page_links), link->id);
+        }
     } else {
         link->socket = NULL;
         efree(link);
@@ -1521,19 +1523,18 @@ PHP_MINIT_FUNCTION(msgsrv)
     Z_TYPE(msgsrv_module_entry) = type;
 
     /* Alloc Persistent Link Table */
+    /*
     if (MSGSRV_SG(allow_persistent)) {
         ALLOC_HASHTABLE(MSGSRV_SG(persistent_links));
         if (zend_hash_init(MSGSRV_SG(persistent_links), PHP_MSGSRV_PAGE_PLINKS_INIT_SIZE, NULL, NULL, TRUE) == FAILURE) {
             FREE_HASHTABLE(MSGSRV_SG(persistent_links));
             return FAILURE;
         }
-    }
+    }*/
 
     return SUCCESS;
 }
 /* }}} */
-
-
 
 /* {{{ php_msgsrv_persistent_helper */
 /*static int php_msgsrv_persistent_helper(zend_rsrc_list_entry *le TSRMLS_DC)
@@ -1550,15 +1551,56 @@ PHP_MINIT_FUNCTION(msgsrv)
 
 PHP_MSHUTDOWN_FUNCTION(msgsrv)
 {
-    UNREGISTER_INI_ENTRIES();
+    php_msgsrv_conn *conn = NULL;
+    list_entry  *le;
+    char *key = NULL;
+    long index = -1;
+    zend_bool duplicate;
+    HashTable *link_hash = &EG(persistent_list);
+
+    if (MSGSRV_SG(trace_mode)) {
+        syslog(LOG_INFO, _LOGGER_SYS " - MsgSrv MSHUTDOWN...");
+    }
 
     /* Free Persistent Link Table */
     if (MSGSRV_SG(allow_persistent)) {
+        for(zend_hash_internal_pointer_reset(link_hash);
+            zend_hash_has_more_elements(link_hash) == SUCCESS; 
+            zend_hash_move_forward(link_hash)) {
+            // #0:get msgsrv link hash key
+            if (zend_hash_get_current_key(link_hash, &key, &index, duplicate) == FAILURE) {
+                // Should never actually fail, since the key is known to exist.
+                continue;
+            }
+            // #0:get msgsrv link
+            if (zend_hash_get_current_data(link_hash, (void**)&le) == FAILURE) {
+                // Should never actually fail, since the key is known to exist.
+                continue;
+            }
+
+            if (le->type != msgsrv_plink) continue;
+            
+            conn = (php_msgsrv_conn *) le->ptr;
+            if (MSGSRV_SG(trace_mode)) {
+                syslog(LOG_DEBUG, _LOGGER_SYS "[%ld] - Close Resource MsgSrv-Link(%s)[Persistent]...", conn->socket->idx, conn->socket->full_app);
+            }
+
+            _close_msgsrv_plink(le);
+            // FREE_RESOURCE(conn->res);
+        }
+
         /* Bug? */
         //zend_hash_destroy(MSGSRV_SG(persistent_links));
-        //FREE_HASHTABLE(MSGSRV_SG(persistent_links));
+        // FREE_HASHTABLE(MSGSRV_SG(persistent_links));
         //zend_hash_apply(MSGSRV_SG(persistent_links), (apply_func_t) php_msgsrv_persistent_helper TSRMLS_CC);
     }
+
+    UNREGISTER_INI_ENTRIES();
+
+    if (MSGSRV_SG(trace_mode)) {
+        syslog(LOG_INFO, _LOGGER_SYS " - MsgSrv MSHUTDOWN OK!");
+    }
+
     closelog ();
     return SUCCESS;
 }
@@ -1569,6 +1611,7 @@ PHP_MSHUTDOWN_FUNCTION(msgsrv)
 PHP_RINIT_FUNCTION(msgsrv)
 {
     MSGSRV_SG(num_links) = MSGSRV_SG(num_persistent);
+    MSGSRV_SG(status) = ALIVE;
     #ifdef MSGSRV_DEBUG
     MSGSRV_SG(trace_mode) = YES;
     #endif
@@ -1588,8 +1631,46 @@ PHP_RINIT_FUNCTION(msgsrv)
 /* {{{ PHP_RSHUTDOWN_FUNCTION */
 PHP_RSHUTDOWN_FUNCTION(msgsrv)
 {
+    php_msgsrv_conn *conn = NULL;
+    HashTable *link_hash = MSGSRV_SG(page_links);
+
+    MSGSRV_SG(status) = DEAD;
+
+    zend_hash_internal_pointer_reset(link_hash);
+    if (zend_hash_has_more_elements(link_hash) == SUCCESS) {
+        // loop all links
+        for(zend_hash_internal_pointer_reset(link_hash);
+                zend_hash_has_more_elements(link_hash) == SUCCESS; zend_hash_move_forward(link_hash)) {
+            // #0:get msgsrv link
+            if (zend_hash_get_current_data(link_hash, (void**)&conn) == FAILURE) {
+                // Should never actually fail, since the key is known to exist.
+                continue;
+            }
+
+            if (conn == NULL || conn->socket == NULL) continue;
+
+            if (MSGSRV_SG(trace_mode)) {
+                if (conn->socket->persistent) {
+                    syslog(LOG_DEBUG, _LOGGER_SYS "[%ld] - Free Resource MsgSrv-Link(%s)[Persistent]...", conn->socket->idx, conn->socket->full_app);
+                } else {
+                    syslog(LOG_DEBUG, _LOGGER_SYS "[%ld] - Free Resource MsgSrv-Link(%s)...", conn->socket->idx, conn->socket->full_app);                    
+                }
+            }
+            FREE_RESOURCE(conn->res);
+        }
+    }
+
+    #ifdef MSGSRV_DEBUG
+    syslog(LOG_INFO, _LOGGER_SYS " - MsgSrv RSHUTDOWN...");
+    #endif
+
     /* Free Page Link Table */
     FREE_HASHTABLE(MSGSRV_SG(page_links));
+
+    #ifdef MSGSRV_DEBUG
+    syslog(LOG_INFO, _LOGGER_SYS " - MsgSrv RSHUTDOWN OK!");
+    #endif
+
     return SUCCESS;
 }
 /* }}} */
@@ -1625,7 +1706,10 @@ PHP_MINFO_FUNCTION(msgsrv)
 
         snprintf(buf, sizeof(buf), "Total: %ld", MSGSRV_SG(num_persistent));
         php_info_print_table_header(2, "MsgSrv Persistent Pool Links", buf);
-        syslog(LOG_INFO, _LOGGER_FUNS "####################[MsgSrv Persistent Pool Links]####################");
+        if (MSGSRV_SG(trace_mode)) {
+            syslog(LOG_INFO, _LOGGER_FUNS "####################[MsgSrv Persistent Pool Links]####################");
+        }
+
         for(zend_hash_internal_pointer_reset(&EG(persistent_list));
             zend_hash_has_more_elements(&EG(persistent_list)) == SUCCESS; 
             zend_hash_move_forward(&EG(persistent_list))) {
@@ -1639,15 +1723,19 @@ PHP_MINFO_FUNCTION(msgsrv)
                 // Should never actually fail, since the key is known to exist.
                 continue;
             }
-            conn = (php_msgsrv_conn *) le->ptr;
-            if (conn->socket->full_app == NULL) continue;
+            if (le->type != msgsrv_plink) continue;
 
-            syslog(LOG_ERR, _LOGGER_FUNS "%ld => %s\n", conn->socket->idx, conn->socket->full_app);
+            conn = (php_msgsrv_conn *) le->ptr;
+            if (MSGSRV_SG(trace_mode)) {
+                syslog(LOG_ERR, _LOGGER_FUNS "%ld => %s\n", conn->socket->idx, conn->socket->full_app);
+            }
             snprintf(buf, sizeof(buf), "%ld", conn->socket->idx);
 
             php_info_print_table_row(2, buf, conn->socket->full_app);
         }
-        syslog(LOG_INFO, _LOGGER_FUNS "######################################################################");
+        if (MSGSRV_SG(trace_mode)) {
+            syslog(LOG_INFO, _LOGGER_FUNS "######################################################################");
+        }
         php_info_print_table_end();
     }
 

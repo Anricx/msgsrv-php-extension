@@ -19,8 +19,9 @@ ZEND_BEGIN_MODULE_GLOBALS(msgsrv)
     long read_timeout;
     long request_timeout;
     long trace_mode;
+    long status;    // 1: alive, 0 dead
 
-    HashTable *persistent_links; // persistent link table
+    // HashTable *persistent_links; // persistent link table
     HashTable *page_links; // current page link table
 ZEND_END_MODULE_GLOBALS(msgsrv)
 
