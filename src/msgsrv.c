@@ -61,6 +61,7 @@ static void php_msgsrv_minit_globals(zend_msgsrv_globals *msgsrv_globals) {
     msgsrv_globals->max_links = -1;
     msgsrv_globals->connect_timeout = 10;
     msgsrv_globals->request_timeout = 10;
+    msgsrv_globals->link_idle_timeout = -1;
     msgsrv_globals->read_timeout = 6;
 
     msgsrv_globals->num_links = 0;
@@ -84,6 +85,7 @@ static int php_msgsrv_do_connect(INTERNAL_FUNCTION_PARAMETERS, int persistent TS
     php_msgsrv_conn *conn = NULL, *conn_dest = NULL;
     MsgSrvSocket *msgsrv_socket;
     ulong conn_id;
+    struct tm * timeinfo;
     long nil;   // this parameter only for msgsrv_open
     // only for persistent
     php_msgsrv_conn *pconn = NULL;
@@ -209,6 +211,35 @@ pconnect:
         tsrm_mutex_unlock( locale_mutex );
 # endif
                 goto connect;
+            } else if (MSGSRV_SG(link_idle_timeout) > 0 && msgsrv_socket->recent_use_time > 0 && (time(NULL) - msgsrv_socket->recent_use_time) >= MSGSRV_SG(link_idle_timeout)) {
+               
+                timeinfo = localtime(&(msgsrv_socket->recent_use_time));
+
+                pconn->socket->busy = NO;
+                pconn->socket->refcount = 0;
+
+                if (MSGSRV_SG(trace_mode)) {
+                    syslog(LOG_DEBUG, _LOGGER_FUNS "[%ld] - [Connect]Current persistent connection %s has idle for too long! Recent use at %s.", msgsrv_socket->idx, msgsrv_socket->persistent_id, asctime( timeinfo ) );
+                }
+                #ifdef MSGSRV_DEBUG_PHP
+                php_printf(_LOGGER_FUNS "[%ld] - [Connect]Current persistent connection %s has idle for too long! Recent use at %s.\n", msgsrv_socket->idx, msgsrv_socket->persistent_id, asctime( timeinfo ) );
+                #endif
+                
+                if (MSGSRV_SG(trace_mode)) {
+                    syslog(LOG_DEBUG, _LOGGER_FUNS "[%ld] - [Connect]Reconnect msgsrv://%s:%ld...", msgsrv_socket->idx, host, port);
+                }
+                #ifdef MSGSRV_DEBUG_PHP
+                php_printf(_LOGGER_FUNS "[%ld] - [Connect]Reconnect msgsrv://%s:%ld...\n", msgsrv_socket->idx, host, port);
+                #endif
+
+                zend_hash_del(&EG(persistent_list), msgsrv_socket->hash_key, msgsrv_socket->hash_key_len + 1);
+                MSGSRV_SG(num_links)--;
+                
+                efree(conn);
+# ifdef ZTS
+        tsrm_mutex_unlock( locale_mutex );
+# endif
+                goto pconnect;
             } else {
                 /* Try to fix mutil thread... */
                 pconn->socket->refcount ++;
@@ -1441,6 +1472,7 @@ static int php_msgsrv_do_close(INTERNAL_FUNCTION_PARAMETERS TSRMLS_DC) {
  */
 static void _close_msgsrv_link(zend_rsrc_list_entry *rsrc TSRMLS_DC)
 {
+    struct tm * timeinfo;
     php_msgsrv_conn *link = (php_msgsrv_conn *)rsrc->ptr;
 
     if (link->socket != NULL) {
@@ -1455,15 +1487,17 @@ static void _close_msgsrv_link(zend_rsrc_list_entry *rsrc TSRMLS_DC)
 
                 zend_hash_del(&EG(persistent_list), link->socket->hash_key, link->socket->hash_key_len + 1);
             } else {
-                if (MSGSRV_SG(trace_mode)) {
-                    syslog(LOG_DEBUG, _LOGGER_SYS "[%ld] - Give Back MsgSrv-Link(%s)[Persistent][%s]...", link->socket->idx, link->socket->full_app, link->socket->hash_key);
-                }
-                #ifdef MSGSRV_DEBUG_PHP
-                php_printf(_LOGGER_SYS "[%ld] - Give Back MsgSrv-Link(%s)[Persistent][%s]...\n", link->socket->idx, link->socket->full_app, link->socket->hash_key);
-                #endif
-
                 link->socket->busy = NO;
                 link->socket->refcount = 0;
+                time (&(link->socket->recent_use_time));
+                timeinfo = localtime(&(link->socket->recent_use_time));
+
+                if (MSGSRV_SG(trace_mode)) {
+                    syslog(LOG_DEBUG, _LOGGER_SYS "[%ld] - Give Back MsgSrv-Link(%s)[Persistent][%s], Recent Use At: %s ...", link->socket->idx, link->socket->full_app, link->socket->hash_key, asctime( timeinfo ));
+                }
+                #ifdef MSGSRV_DEBUG_PHP
+                php_printf(_LOGGER_SYS "[%ld] - Give Back MsgSrv-Link(%s)[Persistent][%s], Recent Use At: %s ...\n", link->socket->idx, link->socket->full_app, link->socket->hash_key, asctime( timeinfo ));
+                #endif
             }
         } else {
             if (MSGSRV_SG(trace_mode)) {

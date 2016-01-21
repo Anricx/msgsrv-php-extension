@@ -137,6 +137,8 @@ typedef struct _msgsrv_socket {
     int            status;
     php_stream     *stream;
 
+    time_t         recent_use_time; // in seconds
+
     char           in_buffer[MSGSRV_BUFFER_SIZE];   // read buffer
 
     char           *full_app;

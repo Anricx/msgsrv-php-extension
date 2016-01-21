@@ -151,6 +151,7 @@ MsgSrvSocket *msgsrv_socket_create(
     msgsrv_socket->status = MSGSRV_SOCKET_STATUS_DISCONNECTED;
     msgsrv_socket->watching = NO;
     msgsrv_socket->full_app = NULL;
+    msgsrv_socket->recent_use_time = -1;
 
     return msgsrv_socket;
 }

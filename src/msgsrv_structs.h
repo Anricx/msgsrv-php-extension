@@ -19,6 +19,7 @@ ZEND_BEGIN_MODULE_GLOBALS(msgsrv)
     long read_timeout;
     long request_timeout;
     long trace_mode;
+    long link_idle_timeout;
     long status;    // 1: alive, 0 dead
 
     // HashTable *persistent_links; // persistent link table
@@ -185,6 +186,7 @@ PHP_INI_BEGIN()
   STD_PHP_INI_ENTRY("msgsrv.max_pool_size",    "10", PHP_INI_ALL,    OnUpdateLong,   max_pool_size,  zend_msgsrv_globals,   msgsrv_globals)
   STD_PHP_INI_ENTRY_EX("msgsrv.max_links",     "-1", PHP_INI_SYSTEM,   OnUpdateLong,   max_links,      zend_msgsrv_globals,   msgsrv_globals,  display_link_numbers)
   STD_PHP_INI_ENTRY("msgsrv.connect_timeout",    "10", PHP_INI_ALL,    OnUpdateLong,   connect_timeout,  zend_msgsrv_globals,   msgsrv_globals)
+  STD_PHP_INI_ENTRY("msgsrv.link_idle_timeout",    "-1", PHP_INI_ALL,    OnUpdateLong,   link_idle_timeout,  zend_msgsrv_globals,   msgsrv_globals)
   STD_PHP_INI_ENTRY("msgsrv.request_timeout",    "10", PHP_INI_ALL,    OnUpdateLong,   request_timeout,  zend_msgsrv_globals,   msgsrv_globals)
   STD_PHP_INI_ENTRY("msgsrv.read_timeout",    "1", PHP_INI_ALL,    OnUpdateLong,   read_timeout,  zend_msgsrv_globals,   msgsrv_globals)
 PHP_INI_END()
