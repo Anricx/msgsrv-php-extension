@@ -161,12 +161,12 @@ zend_module_entry msgsrv_module_entry = {
   STANDARD_MODULE_HEADER,
   "msgsrv",
   msgsrv_functions,
-  PHP_MINIT(msgsrv),     /* Replace with NULL if there is nothing to do at php startup   */ 
+  PHP_MINIT(msgsrv),     /* Replace with NULL if there is nothing to do at php startup   */
   PHP_MSHUTDOWN(msgsrv), /* Replace with NULL if there is nothing to do at php shutdown  */
   PHP_RINIT(msgsrv),     /* Replace with NULL if there is nothing to do at request start */
   PHP_RSHUTDOWN(msgsrv), /* Replace with NULL if there is nothing to do at request end   */
   PHP_MINFO(msgsrv),
-  PHP_MSGSRV_VERSION, 
+  PHP_MSGSRV_VERSION,
   STANDARD_MODULE_PROPERTIES
 };
 /* }}} */

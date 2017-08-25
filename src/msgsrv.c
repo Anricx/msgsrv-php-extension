@@ -8,7 +8,7 @@
    +----------------------------------------------------------------------+
 */
 
-/* $ Id: $ */ 
+/* $ Id: $ */
 
 #include "php_msgsrv.h"
 
@@ -33,6 +33,7 @@ static int msgsrv_link, msgsrv_plink;
         ZVAL_LONG(z, v);                  \
     }
 
+#if PHP_MAJOR_VERSION <= 5
 #define SAFE_ZVAL_STRING(z, v) {          \
         MAKE_STD_ZVAL(z);                   \
         if (v == NULL) {                    \
@@ -41,6 +42,16 @@ static int msgsrv_link, msgsrv_plink;
             ZVAL_STRING(z, v, TRUE);        \
         }                                   \
     }
+#else
+#define SAFE_ZVAL_STRING(z, v) {          \
+        MAKE_STD_ZVAL(z);                   \
+        if (v == NULL) {                    \
+            ZVAL_NULL(z);                   \
+        } else {                            \
+            ZVAL_STRING(z, v);        \
+        }                                   \
+    }
+#endif
 
 #define SAFE_ZVAL_RESOURCE(z, v) {          \
         MAKE_STD_ZVAL(z);                   \
@@ -135,7 +146,7 @@ reconnect:
 
     if (persistent) { /* persistent */
 pconnect:
-        
+
         if (MSGSRV_SG(max_persistent) != -1 && MSGSRV_SG(num_persistent) >= MSGSRV_SG(max_persistent)) {
             if (MSGSRV_SG(trace_mode)) {
                 syslog(LOG_ERR, _LOGGER_FUNS "[%ld] - [Connect]Too many open links (%ld), switch to non persistent..", UNKOWN_LINK_IDX, MSGSRV_SG(num_links));
@@ -151,14 +162,14 @@ pconnect:
         }
 
         msgsrv_socket = msgsrv_socket_create(
-                        host, port, 
-                        app, 
-                        user, 
+                        host, port,
+                        app,
+                        user,
                         pass,
-                        timeout, 
+                        timeout,
                         read_timeout,
                         TRUE, MSGSRV_SG(max_pool_size) TSRMLS_CC);
-    
+
 
         conn = (php_msgsrv_conn *) emalloc(sizeof(php_msgsrv_conn));    /* create the link */
         if (!conn) {
@@ -179,9 +190,18 @@ pconnect:
 # endif
 
         /* try to find if we already have this link in our persistent list */
+        #if PHP_MAJOR_VERSION <= 5
         if (zend_hash_find(&EG(persistent_list), msgsrv_socket->hash_key, msgsrv_socket->hash_key_len + 1, (void **) &le) == SUCCESS) {  /* The link is in our list of persistent connections */
+        #else
+        le = (list_entry *) zend_hash_str_find(&EG(persistent_list), msgsrv_socket->hash_key, msgsrv_socket->hash_key_len + 1);
+        if (le == NULL) {  /* The link is in our list of persistent connections */
+        #endif
             msgsrv_free_socket(msgsrv_socket);
+            #if PHP_MAJOR_VERSION <= 5
             if (Z_TYPE_P(le) != msgsrv_plink) {
+            #else
+            if (Z_TYPE_PP(le) != msgsrv_plink) {
+            #endif
 # ifdef ZTS
         tsrm_mutex_unlock( locale_mutex );
 # endif
@@ -212,7 +232,7 @@ pconnect:
 # endif
                 goto connect;
             } else if (MSGSRV_SG(link_idle_timeout) > 0 && msgsrv_socket->recent_use_time > 0 && (time(NULL) - msgsrv_socket->recent_use_time) >= MSGSRV_SG(link_idle_timeout)) {
-               
+
                 timeinfo = localtime(&(msgsrv_socket->recent_use_time));
 
                 pconn->socket->busy = NO;
@@ -224,7 +244,7 @@ pconnect:
                 #ifdef MSGSRV_DEBUG_PHP
                 php_printf(_LOGGER_FUNS "[%ld] - [Connect]Current persistent connection %s has idle for too long! Recent use at %s.\n", msgsrv_socket->idx, msgsrv_socket->persistent_id, asctime( timeinfo ) );
                 #endif
-                
+
                 if (MSGSRV_SG(trace_mode)) {
                     syslog(LOG_DEBUG, _LOGGER_FUNS "[%ld] - [Connect]Reconnect msgsrv://%s:%ld...", msgsrv_socket->idx, host, port);
                 }
@@ -232,9 +252,14 @@ pconnect:
                 php_printf(_LOGGER_FUNS "[%ld] - [Connect]Reconnect msgsrv://%s:%ld...\n", msgsrv_socket->idx, host, port);
                 #endif
 
+                #if PHP_MAJOR_VERSION <= 5
                 zend_hash_del(&EG(persistent_list), msgsrv_socket->hash_key, msgsrv_socket->hash_key_len + 1);
+                #else
+                zend_hash_str_del(&EG(persistent_list), msgsrv_socket->hash_key, msgsrv_socket->hash_key_len + 1);
+                #endif
+
                 MSGSRV_SG(num_links)--;
-                
+
                 efree(conn);
 # ifdef ZTS
         tsrm_mutex_unlock( locale_mutex );
@@ -277,7 +302,7 @@ pconnect:
                 #ifdef MSGSRV_DEBUG_PHP
                 php_printf(_LOGGER_FUNS "[%ld] - [Connect]Current persistent connection %s ping failed!\n", msgsrv_socket->idx, msgsrv_socket->persistent_id);
                 #endif
-                
+
                 if (MSGSRV_SG(trace_mode)) {
                     syslog(LOG_DEBUG, _LOGGER_FUNS "[%ld] - [Connect]Reconnect msgsrv://%s:%ld...", msgsrv_socket->idx, host, port);
                 }
@@ -285,9 +310,13 @@ pconnect:
                 php_printf(_LOGGER_FUNS "[%ld] - [Connect]Reconnect msgsrv://%s:%ld...\n", msgsrv_socket->idx, host, port);
                 #endif
 
+                #if PHP_MAJOR_VERSION <= 5
                 zend_hash_del(&EG(persistent_list), msgsrv_socket->hash_key, msgsrv_socket->hash_key_len + 1);
+                #else
+                zend_hash_str_del(&EG(persistent_list), msgsrv_socket->hash_key, msgsrv_socket->hash_key_len + 1);
+                #endif
                 MSGSRV_SG(num_links)--;
-                
+
                 efree(conn);
 # ifdef ZTS
         tsrm_mutex_unlock( locale_mutex );
@@ -296,7 +325,12 @@ pconnect:
             }
             /* Push this new link into page link table! */
             conn_id = zend_hash_next_free_element(MSGSRV_SG(page_links));
+            #if PHP_MAJOR_VERSION <= 5
             if (zend_hash_index_update(MSGSRV_SG(page_links), conn_id, (void *)conn, sizeof(php_msgsrv_conn), (void **)&conn_dest) == FAILURE) {
+            #else
+            conn_dest = (php_msgsrv_conn *) zend_hash_index_update(MSGSRV_SG(page_links), conn_id, (void *)conn);
+            if (conn_dest == NULL) {
+            #endif
                 pconn->socket->busy = NO;
                 pconn->socket->refcount = 0;
 
@@ -310,7 +344,7 @@ pconnect:
                 php_error(E_WARNING, "Out of memory while cache link in page link table!");
 
                 msgsrv_socket_disconnect(msgsrv_socket, MSGSRV_SG(trace_mode) TSRMLS_CC);
-                msgsrv_free_socket(msgsrv_socket);    
+                msgsrv_free_socket(msgsrv_socket);
                 efree(conn);
 # ifdef ZTS
         tsrm_mutex_unlock( locale_mutex );
@@ -319,7 +353,7 @@ pconnect:
             }
             efree(conn);
 
-            /* add it to the list */            
+            /* add it to the list */
             ZEND_REGISTER_RESOURCE(return_value, conn_dest, msgsrv_plink);
             conn_dest->res = return_value;
             conn_dest->id = conn_id;
@@ -335,7 +369,7 @@ pconnect:
             #endif
 
             pconn = (php_msgsrv_conn *) pemalloc(sizeof(php_msgsrv_conn), persistent);    /* create the link detail */
-            if (!pconn) {                
+            if (!pconn) {
                 if (MSGSRV_SG(trace_mode)) {
                     syslog(LOG_ERR, _LOGGER_FUNS "[%ld] - [Connect]Out of memory while allocating memory for a persistent link.", msgsrv_socket->idx);
                 }
@@ -347,7 +381,7 @@ pconnect:
                 efree(conn);
 # ifdef ZTS
         tsrm_mutex_unlock( locale_mutex );
-# endif                
+# endif
                 return FAILURE;
             }
 
@@ -370,7 +404,11 @@ pconnect:
             /* hash it up */
             new_le.type = msgsrv_plink;
             new_le.ptr = pconn;
+            #if PHP_MAJOR_VERSION <= 5
             if (zend_hash_update(&EG(persistent_list), msgsrv_socket->hash_key, msgsrv_socket->hash_key_len + 1, (void *) &new_le, sizeof(list_entry), NULL) == FAILURE) {
+            #else
+            if (zend_hash_str_update(&EG(persistent_list), msgsrv_socket->hash_key, sizeof(msgsrv_socket->hash_key), (zval *) &new_le) == FAILURE) {
+            #endif
                 msgsrv_socket_disconnect(msgsrv_socket, MSGSRV_SG(trace_mode) TSRMLS_CC);
                 msgsrv_free_socket(msgsrv_socket);
                 efree(conn);
@@ -397,7 +435,13 @@ pconnect:
 
             /* Push this new link into page link table! */
             conn_id = zend_hash_next_free_element(MSGSRV_SG(page_links));
+
+            #if PHP_MAJOR_VERSION <= 5
             if (zend_hash_index_update(MSGSRV_SG(page_links), conn_id, (void *)conn, sizeof(php_msgsrv_conn), (void **)&conn_dest) == FAILURE) {
+            #else
+            conn_dest = (php_msgsrv_conn *) zend_hash_index_update(MSGSRV_SG(page_links), conn_id, (void *)conn);
+            if (conn_dest == NULL) {
+            #endif
                 if (MSGSRV_SG(trace_mode)) {
                     syslog(LOG_ERR, _LOGGER_FUNS "[%ld] - [Open]Out of memory while cache link in page link table!", msgsrv_socket->idx);
                 }
@@ -408,7 +452,7 @@ pconnect:
                 php_error(E_WARNING, "Out of memory while cache link in page link table!");
 
                 msgsrv_socket_disconnect(msgsrv_socket, MSGSRV_SG(trace_mode) TSRMLS_CC);
-                msgsrv_free_socket(msgsrv_socket);    
+                msgsrv_free_socket(msgsrv_socket);
                 efree(conn);
                 pefree(pconn, persistent);
 # ifdef ZTS
@@ -436,11 +480,11 @@ pconnect:
 connect:
 
         msgsrv_socket = msgsrv_socket_create(
-                            host, port, 
-                            app, 
-                            user, 
+                            host, port,
+                            app,
+                            user,
                             pass,
-                            timeout, 
+                            timeout,
                             read_timeout,
                             FALSE, 0 TSRMLS_CC);
 
@@ -469,7 +513,13 @@ connect:
 
         /* Push this new link into page link table! */
         conn_id = zend_hash_next_free_element(MSGSRV_SG(page_links));
+
+        #if PHP_MAJOR_VERSION <= 5
         if (zend_hash_index_update(MSGSRV_SG(page_links), conn_id, (void *)conn, sizeof(php_msgsrv_conn), (void **)&conn_dest) == FAILURE) {
+        #else
+        conn_dest = (php_msgsrv_conn *) zend_hash_index_update(MSGSRV_SG(page_links), conn_id, (void *)conn);
+        if (conn_dest == NULL) {
+        #endif
             if (MSGSRV_SG(trace_mode)) {
                 syslog(LOG_ERR, _LOGGER_FUNS "[%ld] - [Open]Out of memory while cache link in page link table!", msgsrv_socket->idx);
             }
@@ -481,8 +531,8 @@ connect:
 
             msgsrv_socket_disconnect(msgsrv_socket, MSGSRV_SG(trace_mode) TSRMLS_CC);
             msgsrv_free_socket(msgsrv_socket);
-            efree(conn);        
-            return FAILURE;       
+            efree(conn);
+            return FAILURE;
         }
         efree(conn);
 
@@ -492,7 +542,7 @@ connect:
         conn_dest->id = conn_id;
         MSGSRV_SG(num_links)++;
         return SUCCESS;
-    }    
+    }
 }
 /* }}} */
 
@@ -609,8 +659,8 @@ static int php_msgsrv_do_send(INTERNAL_FUNCTION_PARAMETERS TSRMLS_DC) {
 
 /* {{{ _php_msgsrv_do_callback */
 static int _php_msgsrv_do_callback(
-                            zend_fcall_info fci, 
-                            zend_fcall_info_cache fcc, 
+                            zend_fcall_info fci,
+                            zend_fcall_info_cache fcc,
                             long status,
                             char *from,
                             char *cmd,
@@ -624,15 +674,24 @@ static int _php_msgsrv_do_callback(
     SAFE_ZVAL_STRING(_cmd, cmd);
     SAFE_ZVAL_STRING(_body, body);
     SAFE_ZVAL_RESOURCE(_link, link_res);
+
     params[0] = &_status; params[1] = &_from; params[2] = &_cmd; params[3] = &_body; params[4] = &_link;
 
+    #if PHP_MAJOR_VERSION <= 5
     fci.params = params;
     fci.retval_ptr_ptr = &retval_ptr;
+    #else
+    zend_fcall_info_args(&fci, *params);
+    fci.retval = retval_ptr;
+    #endif
+
     fci.param_count = 5;
     fci.no_separation = 1;
 
     if (zend_call_function(&fci, &fcc TSRMLS_CC) != SUCCESS) return FAILURE;
+
     if (retval_ptr != NULL) zval_ptr_dtor(&retval_ptr);
+
     return SUCCESS;
 }
 /* }}} */
@@ -706,7 +765,12 @@ static int _php_msgsrv_do_receive_any(zend_fcall_info fci, zend_fcall_info_cache
         for(zend_hash_internal_pointer_reset(link_hash);
                 zend_hash_has_more_elements(link_hash) == SUCCESS; zend_hash_move_forward(link_hash)) {
             // #0:get msgsrv link
+            #if PHP_MAJOR_VERSION <= 5
             if (zend_hash_get_current_data(link_hash, (void**)&conn) == FAILURE) {
+            #else
+            conn = zend_hash_get_current_data(link_hash);
+            if (conn == NULL) {
+            #endif
                 // Should never actually fail, since the key is known to exist.
                 continue;
             }
@@ -769,7 +833,7 @@ static int _php_msgsrv_do_receive_any(zend_fcall_info fci, zend_fcall_info_cache
 
                         conn->error = MSGSRV_ERROR_READ_ERROR;
                         conn->socket->status = MSGSRV_SOCKET_STATUS_FINISH;
-                        
+
                         MSGSRV_RECEIVE_SAFE_CALLBACK(fci, fcc, MSGSRV_STATUS_UNKOWN, NULL, NULL, NULL, conn->res, YES, conn->socket->idx);
                     }
                     break;
@@ -817,7 +881,7 @@ static int _php_msgsrv_do_receive_any(zend_fcall_info fci, zend_fcall_info_cache
                     php_printf(_LOGGER_FUNS "[%ld] - [Receive]Playload Receive Error, Target Application Not Found(%s).\n", conn->socket->idx, _body);
                     #endif
                     php_error(E_WARNING, "Playload Receive Error, Target Application Not Found(%s).", _body);
-                    
+
                     MSGSRV_RECEIVE_SAFE_CALLBACK(fci, fcc, MSGSRV_STATUS_ERROR_APPLICATION, _from, _cmd, _body, conn->res, NO, conn->socket->idx);
                 } else {
                     if (MSGSRV_SG(trace_mode)) {
@@ -897,7 +961,7 @@ static int _php_msgsrv_do_receive_link(zend_fcall_info fci, zend_fcall_info_cach
             for (_i = received; _i < limit; ++_i) {
                 MSGSRV_RECEIVE_SAFE_CALLBACK(fci, fcc, MSGSRV_STATUS_TIMEOUT, NULL, NULL, NULL, link_res, NO, conn->socket->idx);
             }
-            
+
             conn->error = MSGSRV_ERROR_READ_TIMEOUT;
             conn->socket->status = MSGSRV_SOCKET_STATUS_FINISH;
             return FAILURE;
@@ -916,7 +980,7 @@ static int _php_msgsrv_do_receive_link(zend_fcall_info fci, zend_fcall_info_cach
             for (_i = received; _i < limit; ++_i) {
                 MSGSRV_RECEIVE_SAFE_CALLBACK(fci, fcc, MSGSRV_SOCKET_STATUS_DISCONNECTED, NULL, NULL, NULL, link_res, NO, conn->socket->idx);
             }
-            
+
             conn->error = MSGSRV_ERROR_DISCONNECT;
             return FAILURE;
         }
@@ -965,7 +1029,7 @@ static int _php_msgsrv_do_receive_link(zend_fcall_info fci, zend_fcall_info_cach
 
                     conn->error = MSGSRV_ERROR_READ_ERROR;
                     conn->socket->status = MSGSRV_SOCKET_STATUS_FINISH;
-                    
+
                     MSGSRV_RECEIVE_SAFE_CALLBACK(fci, fcc, MSGSRV_STATUS_UNKOWN, NULL, NULL, NULL, link_res, YES, conn->socket->idx);
                 }
                 break;
@@ -1013,7 +1077,7 @@ static int _php_msgsrv_do_receive_link(zend_fcall_info fci, zend_fcall_info_cach
                 php_printf(_LOGGER_FUNS "[%ld] - [Receive]Playload Receive Error, Target Application Not Found(%s).\n", conn->socket->idx, _body);
                 #endif
                 php_error(E_WARNING, "Playload Receive Error, Target Application Not Found(%s).", _body);
-                
+
                 MSGSRV_RECEIVE_SAFE_CALLBACK(fci, fcc, MSGSRV_STATUS_ERROR_APPLICATION, _from, _cmd, _body, link_res, NO, conn->socket->idx);
             } else {
                 if (MSGSRV_SG(trace_mode)) {
@@ -1083,7 +1147,12 @@ static int php_msgsrv_do_request(INTERNAL_FUNCTION_PARAMETERS TSRMLS_DC) {
         return FAILURE;
     }
     /* Get php_msgsrv_conn from resources */
+    #if PHP_MAJOR_VERSION <= 5
     ZEND_FETCH_RESOURCE2(conn, php_msgsrv_conn *, &link_res, -1, NULL, msgsrv_link, msgsrv_plink);
+    #else
+    ZEND_FETCH_RESOURCE2(conn, NULL, msgsrv_link, msgsrv_plink);
+    #endif
+
     if (conn == NULL) {
         if (MSGSRV_SG(trace_mode)) {
             syslog(LOG_ERR, _LOGGER_FUNS "[%ld] - [Request]Playload(%s %s %s) Failed(connection not found, closed?)!", UNKOWN_LINK_IDX, target, cmd, body);
@@ -1243,7 +1312,7 @@ static int php_msgsrv_do_request(INTERNAL_FUNCTION_PARAMETERS TSRMLS_DC) {
         default:    // unkown error
             if (MSGSRV_SG(trace_mode)) {
                 syslog(LOG_ERR, _LOGGER_FUNS "[%ld] - [Request]Playload => [%s] Illegal Replay Playload! Response => [%s]", msgsrv_socket->idx, playload, reply);
-            }                
+            }
             #ifdef MSGSRV_DEBUG_PHP
             php_printf(_LOGGER_FUNS "[%ld] - [Request]Playload => [%s] Illegal Replay Playload! Response => [%s]\n", msgsrv_socket->idx, playload, reply);
             #endif
@@ -1256,11 +1325,19 @@ static int php_msgsrv_do_request(INTERNAL_FUNCTION_PARAMETERS TSRMLS_DC) {
     /* #4: error response ? */
     if (strcmp(LOCAL_MSGSRV_APPNAME, target) == 0) {  // msgsrv request
         array_init(return_value);
+        #if PHP_MAJOR_VERSION <= 5
         add_assoc_string(return_value, MSGSRV_PLAYLOAD_FROM, _from, TRUE);
         add_assoc_string(return_value, MSGSRV_PLAYLOAD_CMD, _cmd, TRUE);
         if (MSGSRV_PLAYLOAD_DEFAULT == ret) {
             add_assoc_string(return_value, MSGSRV_PLAYLOAD_BODY, _body, TRUE);
         }
+        #else
+        add_assoc_string(return_value, MSGSRV_PLAYLOAD_FROM, _from);
+        add_assoc_string(return_value, MSGSRV_PLAYLOAD_CMD, _cmd);
+        if (MSGSRV_PLAYLOAD_DEFAULT == ret) {
+            add_assoc_string(return_value, MSGSRV_PLAYLOAD_BODY, _body);
+        }
+        #endif
 
         if (MSGSRV_SG(trace_mode)) {
             syslog(LOG_INFO, _LOGGER_FUNS "[%ld] - [Request]Playload => [%s] Successfully! Response => [%s %s %s]", msgsrv_socket->idx, playload, _from, _cmd, _body);
@@ -1268,7 +1345,7 @@ static int php_msgsrv_do_request(INTERNAL_FUNCTION_PARAMETERS TSRMLS_DC) {
         #ifdef MSGSRV_DEBUG_PHP
         php_printf(_LOGGER_FUNS "[%ld] - [Request]Playload => [%s] Successfully! Response => [%s %s %s]\n", msgsrv_socket->idx, playload, _from, _cmd, _body);
         #endif
-        
+
         efree(playload);
         efree(reply);
         return SUCCESS;
@@ -1302,11 +1379,19 @@ static int php_msgsrv_do_request(INTERNAL_FUNCTION_PARAMETERS TSRMLS_DC) {
         }
     } else {
         array_init(return_value);
+        #if PHP_MAJOR_VERSION <= 5
         add_assoc_string(return_value, MSGSRV_PLAYLOAD_FROM, _from, TRUE);
         add_assoc_string(return_value, MSGSRV_PLAYLOAD_CMD, _cmd, TRUE);
         if (MSGSRV_PLAYLOAD_DEFAULT == ret) {
             add_assoc_string(return_value, MSGSRV_PLAYLOAD_BODY, _body, TRUE);
         }
+        #else
+        add_assoc_string(return_value, MSGSRV_PLAYLOAD_FROM, _from);
+        add_assoc_string(return_value, MSGSRV_PLAYLOAD_CMD, _cmd);
+        if (MSGSRV_PLAYLOAD_DEFAULT == ret) {
+            add_assoc_string(return_value, MSGSRV_PLAYLOAD_BODY, _body);
+        }
+        #endif
 
         if (MSGSRV_SG(trace_mode)) {
             syslog(LOG_INFO, _LOGGER_FUNS "[%ld] - [Request]Playload => [%s] Successfully! Response => [%s %s %s]", msgsrv_socket->idx, playload, _from, _cmd, _body);
@@ -1416,7 +1501,12 @@ static int php_msgsrv_get_full_app(INTERNAL_FUNCTION_PARAMETERS TSRMLS_DC) {
         php_printf(_LOGGER_FUNS "[%ld] - [FullApp]Get Successfully => %s\n", conn->socket->idx, conn->socket->full_app);
         #endif
 
-        RETVAL_STRING(conn->socket->full_app, TRUE);
+        #if PHP_MAJOR_VERSION <= 5
+            RETVAL_STRING(conn->socket->full_app, TRUE);
+        #else
+            RETVAL_STRING(conn->socket->full_app);
+        #endif
+
         return SUCCESS;
     }
 }
@@ -1428,7 +1518,7 @@ static int php_msgsrv_get_full_app(INTERNAL_FUNCTION_PARAMETERS TSRMLS_DC) {
 static int php_msgsrv_do_close(INTERNAL_FUNCTION_PARAMETERS TSRMLS_DC) {
     zval * link_res = NULL;
     php_msgsrv_conn *conn = NULL;
-    zend_rsrc_list_entry *le;
+    list_entry *le;
 
     if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "r", &link_res) == FAILURE) {
         return FAILURE;
@@ -1470,7 +1560,7 @@ static int php_msgsrv_do_close(INTERNAL_FUNCTION_PARAMETERS TSRMLS_DC) {
 
 /* {{{ _close_msgsrv_link
  */
-static void _close_msgsrv_link(zend_rsrc_list_entry *rsrc TSRMLS_DC)
+static void _close_msgsrv_link(list_entry *rsrc TSRMLS_DC)
 {
     struct tm * timeinfo;
     php_msgsrv_conn *link = (php_msgsrv_conn *)rsrc->ptr;
@@ -1485,7 +1575,12 @@ static void _close_msgsrv_link(zend_rsrc_list_entry *rsrc TSRMLS_DC)
                 php_printf(_LOGGER_SYS "[%ld] - Connection Error, Give Up MsgSrv-Link(%s)[Persistent][%s]...\n", link->socket->idx, link->socket->full_app, link->socket->hash_key);
                 #endif
 
+
+                #if PHP_MAJOR_VERSION <= 5
                 zend_hash_del(&EG(persistent_list), link->socket->hash_key, link->socket->hash_key_len + 1);
+                #else
+                zend_hash_str_del(&EG(persistent_list), link->socket->hash_key, link->socket->hash_key_len + 1);
+                #endif
             } else {
                 link->socket->busy = NO;
                 link->socket->refcount = 0;
@@ -1527,14 +1622,14 @@ static void _close_msgsrv_link(zend_rsrc_list_entry *rsrc TSRMLS_DC)
 
 /* {{{ _close_msgsrv_plink
  */
-static void _close_msgsrv_plink(zend_rsrc_list_entry *rsrc TSRMLS_DC)
+static void _close_msgsrv_plink(list_entry *rsrc TSRMLS_DC)
 {
     php_msgsrv_conn *link = (php_msgsrv_conn *)rsrc->ptr;
     if (link->socket != NULL) {
         if (MSGSRV_SG(trace_mode)) {
             syslog(LOG_DEBUG, _LOGGER_SYS "[%ld] - Free MsgSrv-Link(%s)[Persistent]...", link->socket->idx, link->socket->full_app);
         }
-        
+
         msgsrv_socket_disconnect(link->socket, MSGSRV_SG(trace_mode) TSRMLS_CC);
         msgsrv_free_socket(link->socket);
 
@@ -1571,7 +1666,7 @@ PHP_MINIT_FUNCTION(msgsrv)
 /* }}} */
 
 /* {{{ php_msgsrv_persistent_helper */
-/*static int php_msgsrv_persistent_helper(zend_rsrc_list_entry *le TSRMLS_DC)
+/*static int php_msgsrv_persistent_helper(list_entry *le TSRMLS_DC)
 {
     if (le->type == msgsrv_plink) {
         php_printf("xxxx...\n");
@@ -1587,8 +1682,13 @@ PHP_MSHUTDOWN_FUNCTION(msgsrv)
 {
     php_msgsrv_conn *conn = NULL;
     list_entry  *le;
+    #if PHP_MAJOR_VERSION <= 5
     char *key = NULL;
     long index = -1;
+    #else
+    zend_string *key = NULL;
+    zend_ulong index = -1;
+    #endif
     zend_bool duplicate;
     HashTable *link_hash = &EG(persistent_list);
 
@@ -1599,21 +1699,30 @@ PHP_MSHUTDOWN_FUNCTION(msgsrv)
     /* Free Persistent Link Table */
     if (MSGSRV_SG(allow_persistent)) {
         for(zend_hash_internal_pointer_reset(link_hash);
-            zend_hash_has_more_elements(link_hash) == SUCCESS; 
+            zend_hash_has_more_elements(link_hash) == SUCCESS;
             zend_hash_move_forward(link_hash)) {
             // #0:get msgsrv link hash key
+            #if PHP_MAJOR_VERSION <= 5
             if (zend_hash_get_current_key(link_hash, &key, &index, duplicate) == FAILURE) {
+            #else
+            if (zend_hash_get_current_key(link_hash, &key, &index) == FAILURE) {
+            #endif
                 // Should never actually fail, since the key is known to exist.
                 continue;
             }
             // #0:get msgsrv link
+            #if PHP_MAJOR_VERSION <= 5
             if (zend_hash_get_current_data(link_hash, (void**)&le) == FAILURE) {
+            #else
+            le = zend_hash_get_current_data(link_hash);
+            if (le == NULL) {
+            #endif
                 // Should never actually fail, since the key is known to exist.
                 continue;
             }
 
             if (le->type != msgsrv_plink) continue;
-            
+
             conn = (php_msgsrv_conn *) le->ptr;
             if (MSGSRV_SG(trace_mode)) {
                 syslog(LOG_DEBUG, _LOGGER_SYS "[%ld] - Close Resource MsgSrv-Link(%s)[Persistent]...", conn->socket->idx, conn->socket->full_app);
@@ -1652,11 +1761,15 @@ PHP_RINIT_FUNCTION(msgsrv)
 
     /* Alloc Page Link Table */
     ALLOC_HASHTABLE(MSGSRV_SG(page_links));
+    #if PHP_MAJOR_VERSION <= 5
     if (zend_hash_init(MSGSRV_SG(page_links), PHP_MSGSRV_PAGE_LINKS_INIT_SIZE, NULL, NULL, FALSE) == FAILURE) {
         FREE_HASHTABLE(MSGSRV_SG(page_links));
         return FAILURE;
     }
-    
+    #else
+    zend_hash_init(MSGSRV_SG(page_links), PHP_MSGSRV_PAGE_LINKS_INIT_SIZE, NULL, NULL, FALSE);
+    #endif
+
     return SUCCESS;
 }
 /* }}} */
@@ -1676,7 +1789,12 @@ PHP_RSHUTDOWN_FUNCTION(msgsrv)
         for(zend_hash_internal_pointer_reset(link_hash);
                 zend_hash_has_more_elements(link_hash) == SUCCESS; zend_hash_move_forward(link_hash)) {
             // #0:get msgsrv link
+            #if PHP_MAJOR_VERSION <= 5
             if (zend_hash_get_current_data(link_hash, (void**)&conn) == FAILURE) {
+            #else
+            conn = zend_hash_get_current_data(link_hash);
+            if (conn == NULL) {
+            #endif
                 // Should never actually fail, since the key is known to exist.
                 continue;
             }
@@ -1687,7 +1805,7 @@ PHP_RSHUTDOWN_FUNCTION(msgsrv)
                 if (conn->socket->persistent) {
                     syslog(LOG_DEBUG, _LOGGER_SYS "[%ld] - Free Resource MsgSrv-Link(%s)[Persistent]...", conn->socket->idx, conn->socket->full_app);
                 } else {
-                    syslog(LOG_DEBUG, _LOGGER_SYS "[%ld] - Free Resource MsgSrv-Link(%s)...", conn->socket->idx, conn->socket->full_app);                    
+                    syslog(LOG_DEBUG, _LOGGER_SYS "[%ld] - Free Resource MsgSrv-Link(%s)...", conn->socket->idx, conn->socket->full_app);
                 }
             }
             FREE_RESOURCE(conn->res);
@@ -1732,7 +1850,7 @@ PHP_MINFO_FUNCTION(msgsrv)
     snprintf(buf, sizeof(buf), "%ld", MSGSRV_SG(num_links));
     php_info_print_table_row(2, "Active Links", buf);
     php_info_print_table_end();
-    
+
     DISPLAY_INI_ENTRIES();
 
     if (MSGSRV_SG(allow_persistent)) {
@@ -1745,15 +1863,24 @@ PHP_MINFO_FUNCTION(msgsrv)
         }
 
         for(zend_hash_internal_pointer_reset(&EG(persistent_list));
-            zend_hash_has_more_elements(&EG(persistent_list)) == SUCCESS; 
+            zend_hash_has_more_elements(&EG(persistent_list)) == SUCCESS;
             zend_hash_move_forward(&EG(persistent_list))) {
             // #0:get msgsrv link hash key
+            #if PHP_MAJOR_VERSION <= 5
             if (zend_hash_get_current_key(&EG(persistent_list), &key, &index, duplicate) == FAILURE) {
+            #else
+            if (zend_hash_get_current_key(&EG(persistent_list), &key, &index) == FAILURE) {
+            #endif
                 // Should never actually fail, since the key is known to exist.
                 continue;
             }
             // #0:get msgsrv link
+            #if PHP_MAJOR_VERSION <= 5
             if (zend_hash_get_current_data(&EG(persistent_list), (void**)&le) == FAILURE) {
+            #else
+            le = (list_entry *) zend_hash_get_current_data(&EG(persistent_list));
+            if (le == NULL) {
+            #endif
                 // Should never actually fail, since the key is known to exist.
                 continue;
             }
@@ -1799,7 +1926,7 @@ PHP_FUNCTION(msgsrv_open)
     if (php_msgsrv_do_connect(INTERNAL_FUNCTION_PARAM_PASSTHRU, persistent ? TRUE : FALSE TSRMLS_CC) == FAILURE) {
         RETURN_FALSE;
     }
-#endif    
+#endif
 }
 /* }}} msgsrv_open */
 

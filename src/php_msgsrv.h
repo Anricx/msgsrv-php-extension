@@ -31,13 +31,13 @@ extern "C" {
 #include <ext/standard/info.h>
 #include <Zend/zend_extensions.h>
 #ifdef  __cplusplus
-} // extern "C" 
+} // extern "C"
 #endif
 #ifdef  __cplusplus
 extern "C" {
 #endif
 
-#ifdef ZEND_ENGINE_2
+#if (defined(ZEND_ENGINE_2) || defined(ZEND_ENGINE_3))
 # include "zend_exceptions.h"
 #else
   /* PHP 4 compat */
@@ -49,8 +49,12 @@ extern "C" {
 const zend_fcall_info empty_fcall_info = { 0, NULL, NULL, NULL, NULL, 0, NULL, NULL, 0 };
 #endif
 
-#if (PHP_MAJOR_VERSION >= 5 && PHP_MINOR_VERSION > 3)
+#if (PHP_MAJOR_VERSION == 5 && PHP_MINOR_VERSION > 3)
 #define list_entry zend_rsrc_list_entry
+#endif
+
+#if PHP_MAJOR_VERSION == 7
+#define list_entry zend_resource
 #endif
 
 extern zend_module_entry msgsrv_module_entry;
@@ -88,7 +92,7 @@ PHP_MINFO_FUNCTION(msgsrv);
 #include "msgsrv_structs.h"
 
 #ifdef  __cplusplus
-} // extern "C" 
+} // extern "C"
 #endif
 
 #endif /* PHP_HAVE_MSGSRV */
